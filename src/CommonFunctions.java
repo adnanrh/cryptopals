@@ -3,7 +3,6 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -66,16 +65,12 @@ public class CommonFunctions {
 
     public static List<String> findSingleXorCipherAndMessage(String xordMessage) throws DecoderException {
         HashMap<Character, String> cipherMessageMap = new HashMap<>();
-        for (int i = 65; i <= 90; i++) {
-            System.out.println("Cipher: " + (char) i + " +: " + decryptSingleXorCipher(xordMessage, Integer.toHexString(i)));
+        for (int i = 0; i < 256; i++) {
             cipherMessageMap.put((char) i, decryptSingleXorCipher(xordMessage, Integer.toHexString(i)));
         }
-        for (int i = 97; i <= 122; i++) {
-            System.out.println("Cipher: " + (char) i + " +: " + decryptSingleXorCipher(xordMessage, Integer.toHexString(i)));
-            cipherMessageMap.put((char) i, decryptSingleXorCipher(xordMessage, Integer.toHexString(i)));
-        }
+
         Character bestCipher = findBestScoreCipher(cipherMessageMap);
-        System.out.println("Found single character cipher: " + bestCipher + " with message: " + cipherMessageMap.get(bestCipher));
+        //System.out.println("Found single character cipher: " + bestCipher + " with message: " + cipherMessageMap.get(bestCipher));
         return Arrays.asList(String.valueOf(bestCipher), cipherMessageMap.get(bestCipher));
     }
 
@@ -138,7 +133,6 @@ public class CommonFunctions {
         System.out.println(hexToBase64("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"));
         System.out.println(hexXor("1c0111001f010100061a024b53535009181c", "686974207468652062756c6c277320657965"));
         System.out.println(findSingleXorCipherAndMessage("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"));
-
-        findEncryptedStringFromFile("files/4.txt");
+        System.out.println(findEncryptedStringFromFile("files/4.txt"));
     }
 }
