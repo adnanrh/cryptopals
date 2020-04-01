@@ -3,13 +3,18 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Arrays.copyOfRange;
 
 public class CommonFunctions {
     private static final Map<Character, Double> CHAR_FREQUENCIES = initializeCharFrequencies();
@@ -46,6 +51,14 @@ public class CommonFunctions {
         return Collections.unmodifiableMap(map);
     }
 
+    private static byte[] getXorBytes(byte[] a, byte[] b) {
+        byte[] xorBytes = new byte[a.length];
+        for (int i = 0; i < xorBytes.length; i++) {
+            xorBytes[i] = (byte) (a[i] ^ b[i]);
+        }
+        return xorBytes;
+    }
+
     public static String hexToBase64(String hexString) throws DecoderException {
         byte[] decodedHex = Hex.decodeHex(hexString);
         return Base64.encodeBase64String(decodedHex);
@@ -56,31 +69,27 @@ public class CommonFunctions {
             throw new IllegalArgumentException("Buffers must be of equal size.");
         byte[] decodedHex1 = Hex.decodeHex(buffer1);
         byte[] decodedHex2 = Hex.decodeHex(buffer2);
-        byte[] xorBytes = new byte[decodedHex1.length];
-        for (int i = 0; i < xorBytes.length; i++) {
-            xorBytes[i] = (byte) (decodedHex1[i] ^ decodedHex2[i]);
-        }
+        byte[] xorBytes = getXorBytes(decodedHex1, decodedHex2);
         return Hex.encodeHexString(xorBytes);
     }
 
     public static List<String> findSingleXorCipherAndMessage(String xordMessage) throws DecoderException {
         HashMap<Character, String> cipherMessageMap = new HashMap<>();
         for (int i = 0; i < 256; i++) {
-            cipherMessageMap.put((char) i, decryptSingleXorCipher(xordMessage, Integer.toHexString(i)));
+            cipherMessageMap.put((char) i, decryptRepeatingXorCipher(xordMessage, Integer.toHexString(i)));
         }
 
         Character bestCipher = findBestScoreCipher(cipherMessageMap);
-        //System.out.println("Found single character cipher: " + bestCipher + " with message: " + cipherMessageMap.get(bestCipher));
         return Arrays.asList(String.valueOf(bestCipher), cipherMessageMap.get(bestCipher));
     }
 
-    public static String decryptSingleXorCipher(String xordMessage, String cipher) throws DecoderException {
-        StringBuilder cipherExtended = new StringBuilder();
-        while (cipherExtended.length() != xordMessage.length()) {
-            cipherExtended.append(cipher);
+    public static String decryptRepeatingXorCipher(String xordMessage, String cipher) throws DecoderException {
+        StringBuilder sb = new StringBuilder();
+        while (sb.length() <= xordMessage.length()) {
+            sb.append(cipher);
         }
-        String messageHex = hexXor(xordMessage, cipherExtended.toString());
-        // return decrypted message
+        String cipherExtended = sb.toString().substring(0, xordMessage.length());
+        String messageHex = hexXor(xordMessage, cipherExtended);
         return new String(Hex.decodeHex(messageHex));
     }
 
@@ -107,7 +116,7 @@ public class CommonFunctions {
         return score;
     }
 
-    public static String findEncryptedStringFromFile(String filePath) throws DecoderException, IOException {
+    public static List<String> findEncryptedStringFromFile(String filePath) throws DecoderException, IOException {
         String file = new String(Files.readAllBytes(Paths.get(filePath)));
         List<String> list = Arrays.asList(file.split("\n"));
         HashMap<String, String> bestDecryptions = new HashMap<>();
@@ -125,14 +134,85 @@ public class CommonFunctions {
             }
         }
 
-        System.out.println("The encrypted string is: " + encryptedString + ". The message is: " + bestDecryptions.get(encryptedString));
-        return encryptedString;
+        return Arrays.asList(encryptedString, bestDecryptions.get(encryptedString));
     }
 
-    public static void main(String[] args) throws DecoderException, IOException {
-        System.out.println(hexToBase64("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"));
-        System.out.println(hexXor("1c0111001f010100061a024b53535009181c", "686974207468652062756c6c277320657965"));
-        System.out.println(findSingleXorCipherAndMessage("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"));
-        System.out.println(findEncryptedStringFromFile("files/4.txt"));
+    public static String encryptWithRepeatingKeyXor(String message, String cipher) {
+        StringBuilder cipherExtended = new StringBuilder();
+        for (int i = 0; i < message.length(); i++) {
+            cipherExtended.append(cipher.charAt(i % cipher.length()));
+        }
+
+        byte[] messageBytes = message.getBytes(StandardCharsets.US_ASCII);
+        byte[] cipherBytes = cipherExtended.toString().getBytes(StandardCharsets.US_ASCII);
+        byte[] encryptedBytes = getXorBytes(messageBytes, cipherBytes);
+        return Hex.encodeHexString(encryptedBytes);
+    }
+
+    public static int getHammingDistance(byte[] a, byte[] b) {
+        int result = 0;
+        byte[] xorBytes = getXorBytes(a, b);
+        for (int i = 0; i < xorBytes.length; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (((xorBytes[i] >> j) & 1) == 1)
+                    result++;
+            }
+        }
+        return result;
+    }
+
+    private static int getBestRepeatingKeySize(byte[] encryptedBytes) {
+        int bestKeySize = 0;
+        double bestHammingDistance = Double.MAX_VALUE;
+        for (int i = 2; i <= 40; i++) {
+            double avgHammingDistance = 0;
+            for (int j = i; j < encryptedBytes.length - i; j += i) {
+                byte[] c1 = Arrays.copyOfRange(encryptedBytes, j - i, j);
+                byte[] c2 = Arrays.copyOfRange(encryptedBytes, j, j + i);
+                avgHammingDistance += (double) getHammingDistance(c1, c2) / i;
+            }
+            avgHammingDistance /= ((double)encryptedBytes.length / i);
+            if (avgHammingDistance < bestHammingDistance) {
+                bestHammingDistance = avgHammingDistance;
+                bestKeySize = i;
+            }
+        }
+        return bestKeySize;
+    }
+
+    private static List<String> getEncodedTransposedCipherBlocks(byte[] encryptedBytes, int keySize) {
+        List<List<Byte>> transposed = new ArrayList<>();
+        for (int i = 0; i < keySize; i++) {
+            transposed.add(new ArrayList<>());
+        }
+        for (int i = 0; i < encryptedBytes.length; i++) {
+            transposed.get(i % keySize).add(encryptedBytes[i]);
+        }
+
+        List<String> transposedCiphers = new ArrayList<>();
+        for (int i = 0; i < transposed.size(); i++) {
+            byte[] bytes = new byte[transposed.get(i).size()];
+            for (int j = 0; j < transposed.get(i).size(); j++) {
+                bytes[j] = transposed.get(i).get(j);
+            }
+            transposedCiphers.add(Hex.encodeHexString(bytes));
+        }
+        return transposedCiphers;
+    }
+
+    public static List<String> findRepeatingXorCipherAndMessage(String encryptedMessageBase64) throws DecoderException {
+        byte[] encryptedBytes = Base64.decodeBase64(encryptedMessageBase64);
+        int bestKeySize = getBestRepeatingKeySize(encryptedBytes);
+
+        List<String> transposedCiphers = getEncodedTransposedCipherBlocks(encryptedBytes, bestKeySize);
+        StringBuilder sb = new StringBuilder();
+        for (int j = 0; j < transposedCiphers.size(); j++) {
+            sb.append(findSingleXorCipherAndMessage(transposedCiphers.get(j)).get(0));
+        }
+        String cipherHex = Hex.encodeHexString(sb.toString().getBytes(StandardCharsets.US_ASCII));
+        String decryptedMessage = decryptRepeatingXorCipher(Hex.encodeHexString(Base64.decodeBase64(encryptedMessageBase64)), cipherHex);
+        System.out.println("The message is: " + decryptedMessage);
+
+        return Arrays.asList(sb.toString(), decryptedMessage);
     }
 }
