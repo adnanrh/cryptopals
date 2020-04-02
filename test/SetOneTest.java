@@ -1,5 +1,7 @@
 import org.junit.Test;
 
+import org.apache.commons.codec.binary.Base64;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -57,6 +59,17 @@ public class SetOneTest {
         String expectedKey = "Terminator X: Bring the noise";
         List<String> response = CommonFunctions.findRepeatingXorCipherAndMessage(encryptedBase64);
         assertEquals(expectedKey, response.get(0));
+    }
+
+    @Test
+    public void challenge_seven() throws Exception {
+        String encryptedBase64 = new String(Files.readAllBytes(Paths.get("files/7.txt")));
+        String response = CommonFunctions.decryptAesEcbMode(Base64.decodeBase64(encryptedBase64), "YELLOW SUBMARINE");
+    }
+
+    @Test
+    public void challenge_eight() throws Exception {
+        CommonFunctions.detectEcbEncryptedCipherTextFromFile("files/8.txt");
     }
 
     @Test

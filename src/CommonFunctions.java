@@ -2,19 +2,22 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.Key;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-import static java.util.Arrays.copyOfRange;
 
 public class CommonFunctions {
     private static final Map<Character, Double> CHAR_FREQUENCIES = initializeCharFrequencies();
@@ -214,5 +217,36 @@ public class CommonFunctions {
         System.out.println("The message is: " + decryptedMessage);
 
         return Arrays.asList(sb.toString(), decryptedMessage);
+    }
+
+    public static String decryptAesEcbMode(byte[] encryptedBytes, String key) throws Exception {
+        Key aesKey = new SecretKeySpec(key.getBytes(StandardCharsets.US_ASCII), "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+
+        cipher.init(Cipher.DECRYPT_MODE, aesKey);
+        String decrypted = new String(cipher.doFinal(encryptedBytes));
+        System.out.println(decrypted);
+        return decrypted;
+    }
+
+    public static String detectEcbEncryptedCipherTextFromFile(String filePath) throws Exception {
+        String file = new String(Files.readAllBytes(Paths.get(filePath)));
+        List<String> list = Arrays.asList(file.split("\n"));
+        String ecbString = null;
+        int minUniqueBlocks = Integer.MAX_VALUE;
+        for (String cipherText : list) {
+            Set<String> uniqueBlocks = new HashSet<>();
+            for (int i = 0; i < cipherText.length(); i += 32) {
+                String block = i + 32 > cipherText.length() ? cipherText.substring(i, cipherText.length()) : cipherText.substring(i, i + 32);
+                uniqueBlocks.add(block);
+            }
+            if (uniqueBlocks.size() < minUniqueBlocks) {
+                ecbString = cipherText;
+                minUniqueBlocks = uniqueBlocks.size();
+            }
+        }
+
+        System.out.println(ecbString);
+        return ecbString;
     }
 }
