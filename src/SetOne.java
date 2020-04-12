@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 
-public class CommonFunctions {
+public class SetOne {
     private static final Map<Character, Double> CHAR_FREQUENCIES = initializeCharFrequencies();
 
     private static Map<Character, Double> initializeCharFrequencies() {
@@ -54,7 +54,7 @@ public class CommonFunctions {
         return Collections.unmodifiableMap(map);
     }
 
-    private static byte[] getXorBytes(byte[] a, byte[] b) {
+    public static byte[] getXorBytes(byte[] a, byte[] b) {
         byte[] xorBytes = new byte[a.length];
         for (int i = 0; i < xorBytes.length; i++) {
             xorBytes[i] = (byte) (a[i] ^ b[i]);
