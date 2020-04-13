@@ -38,8 +38,6 @@ public class SetTwoTest {
         byte[] iv = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0".getBytes(StandardCharsets.US_ASCII);
         String response = SetTwo.encryptCBC(plainTextBytes, key, iv);
         String expected = new String(Files.readAllBytes(Paths.get("files/10.txt"))).replaceAll("[\n\r]", "");
-        System.out.println(response);
-        System.out.println("The system new line char(s) is: " + System.lineSeparator());
         assertEquals(expected, response);
     }
 
